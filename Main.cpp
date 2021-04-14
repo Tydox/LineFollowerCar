@@ -259,6 +259,16 @@ switch(dir)
 
 }
 
+void sharpTurn() //TO DOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+{
+  switch (error)
+  {
+
+
+
+  }
+}
+
 void setup(){
   //sensors
   Serial.begin(9600);
@@ -283,5 +293,10 @@ getError(); //get the amount of sway off track
 //debug
 Serial.println(error);
 
+//check if need to do sharp turns
+sharpTurn();
 
+//check PID and set Speed
+calculate_pid();
+motor_control();
 }
