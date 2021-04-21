@@ -1,25 +1,27 @@
 //ENGINE
-const int ena = 10; //left motor - set speed
-const int in1 = 7;
-const int in2 = 6;
-const int in3 = 4; 
-const int in4 = 5;
-const int enb = 9; //right motor - set speed
+ const int ena = 3; //left motor - set speed
+ const int in1 = 6;
+ const int in2 = 13;
+ const int in3 = 2; 
+ const int in4 = 4;
+ const int enb = 5; //right motor - set speed
+
 
 //controll the engine
 int leftMotorSpeed=0;
 int rightMotorSpeed=0;
 
 //Initial Speed of Motor
-int initial_motor_speed = 150;
+int initial_motor_speed = 100;
 
 //IR SENSOR
 const int sensorNum=6;
 
-const int sensorPIN[sensorNum] {12,11,10,7,8,9};
-int linePosition;
+//const int sensorPIN[sensorNum] {12,11,10,7,8,9};
+const int sensorPIN[sensorNum] {7,12,11,10,9,8};
+//int linePosition;
 
-int linePositionNum=5;//random starting number so i can set 0 as a first digit, 5 will be removed
+long linePositionNum=5;//random starting number so i can set 0 as a first digit, 5 will be removed
 //COLOR & DISTANCE SENSOR
 
 
@@ -33,8 +35,8 @@ int D=0;
 int prevError=0;
 int prevI=0;
 //PID CONSTANT
-const int Kp=0;
-const int Kd=0;
+const int Kp=30;
+const int Kd=10;
 const int Ki=0;
 const int M0=0;
 
@@ -50,6 +52,21 @@ void getError()
 {
   switch(linePositionNum)
   {
+    case 5111110:
+    {
+      error = -35;
+      break;
+    }
+    case 5111100:
+    {
+      error = -25;
+      break;
+    }
+    case 5111000:
+    {
+      error = -15;
+      break;
+    }
     case 5100000:
     {
       error = -5;
@@ -106,29 +123,36 @@ void getError()
       break;
     }
 
-    case 5000000: //continue
+    case 5000111: //turn right
     {
-      error = 999;
+      error = 15;
       break;
     }
+    case 5001111: //turn right
+    {
+      error = 25;
+      break;
+    }
+    case 5011111: //turn right
+    {
+      error = 35;
+      break;
+    }
+
+   case 5000000: //continue
+     {
+       error = 999;
+       break;
+     }
     case 5111111: //continue
     {
       error = 777;
       break;
     }
-    case 5001111: //turn right
-    {
-      error = 106;
-      break;
-    }
-    case 5111100: //turn right
-    {
-      error = 104;
-      break;
-    }
+    
     default: 
     {
-       Serial.println("Something went wrong! check the code!!!!!"); 
+       Serial.println("Unkown Error - Line Following Status"); 
        break; 
     }
   }
@@ -138,35 +162,35 @@ void getError()
 
 void calculate_pid()
 {
+  if(error!=777 && error != 999){
   P = error;
   I = I + prevI;
   D = error - prevError;
 
   PID_Val = (Kp * P) + (Ki * I) + (Kd * D);
 
-  prevI = I;
+  //prevI = I;
   prevError = error;
+  }
 }
 
 
 void motor_control()
 {
-  // Calculating the effective motor speed:
- leftMotorSpeed = initial_motor_speed - PID_Val;
- rightMotorSpeed = initial_motor_speed + PID_Val;
+  //change nothing
+  if(error==777 || error == 999)//all black //all white
+    return;
+
+ // Calculating the effective motor speed:
+ leftMotorSpeed = initial_motor_speed + PID_Val;
+ rightMotorSpeed = initial_motor_speed - PID_Val;
 
   // The motor speed should not exceed the max PWM value
-  leftMotorSpeed = constrain(leftMotorSpeed, 0, 255);
+  leftMotorSpeed = constrain(leftMotorSpeed+25, 0, 255);
   rightMotorSpeed = constrain(rightMotorSpeed, 0, 255);
 
-  /*Serial.print(PID_value);
-    Serial.print("\t");
-    Serial.print(left_motor_speed);
-    Serial.print("\t");
-    Serial.println(right_motor_speed);*/
-
-  analogWrite(ena, leftMotorSpeed); //Left Motor Speed
-  analogWrite(enb, rightMotorSpeed - 30); //Right Motor Speed
+  analogWrite(enb, leftMotorSpeed); //Left Motor Speed
+  analogWrite(ena, rightMotorSpeed); //Right Motor Speed
 
   //following lines of code are to make the bot move forward
   turn('F');
@@ -177,8 +201,35 @@ void motor_control()
 
 void printIRDigital()
 {
-   Serial.print("Digital Reading=");
-   Serial.println(linePositionNum%10);
+   Serial.print("Digital Reading: ");
+   Serial.print(linePositionNum);
+   Serial.print("\t");
+}
+
+void printErrorVal()
+{
+     Serial.print("Error Reading: ");
+    Serial.println(error);
+}
+
+void printMotors()
+{
+  Serial.print("PID Value:");
+    Serial.print(PID_Val);
+    Serial.print("\t");
+    Serial.print("Left Value:");
+    Serial.print(leftMotorSpeed);
+    Serial.print("\t");
+    Serial.print("Right Value:");
+    Serial.print(rightMotorSpeed);
+    Serial.print("\t");
+}
+
+void printDEBUG()
+{
+  printMotors();
+  printIRDigital();
+  printErrorVal();
 }
 
 void turn(char dir){
@@ -272,31 +323,31 @@ void sharpTurn() //TO DOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 void setup(){
   //sensors
   Serial.begin(9600);
-  
-  //engines
+
+  // engines
   pinMode(in1, OUTPUT);
   pinMode(in2, OUTPUT);
   pinMode(in3, OUTPUT);
   pinMode(in4, OUTPUT);
-
-  analogWrite(ena, 200);
-  analogWrite(enb, 200);
-
 }
 
 
 void loop()
 {
+ 
 getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
+
 getError(); //get the amount of sway off track
 
 //debug
-Serial.println(error);
-
+//delay(1000);
 //check if need to do sharp turns
-sharpTurn();
-
+//sharpTurn();
+//if(error != 999)
 //check PID and set Speed
 calculate_pid();
 motor_control();
+
+//printDEBUG();
+ delay(20);
 }
