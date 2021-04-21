@@ -36,7 +36,7 @@ int prevError=0;
 int prevI=0;
 //PID CONSTANT
 const int Kp=30;
-const int Kd=10;
+const int Kd=3;
 const int Ki=0;
 const int M0=0;
 
@@ -54,42 +54,42 @@ void getError()
   {
     case 5111110:
     {
-      error = -35;
+      error = -9;
       break;
     }
     case 5111100:
     {
-      error = -25;
+      error = -8;
       break;
     }
     case 5111000:
     {
-      error = -15;
+      error = -7;
       break;
     }
     case 5100000:
     {
-      error = -5;
+      error = -10;
       break;
     }
     case 5110000:
     {
-      error = -4;
+      error = -8;
       break;
     }
     case 5010000:
     {
-      error = -3;
+      error = -6;
       break;
     }
     case 5011000:
     {
-      error = -2;
+      error = -4;
       break;
     }
     case 5001000:
     {
-      error = -1;
+      error = -2;
       break;
     }
     case 5001100:
@@ -99,43 +99,43 @@ void getError()
     }
     case 5000100:
     {
-      error = 1;
+      error = 2;
       break;
     }
     case 5000110:
     {
-      error = 2;
+      error = 4;
       break;
     }
     case 5000010:
     {
-      error = 3;
+      error = 6;
       break;
     }
     case 5000011:
     {
-      error = 4;
+      error = 8;
       break;
     }
     case 5000001: //turn right
     {
-      error = 5;
+      error = 10;
       break;
     }
 
     case 5000111: //turn right
     {
-      error = 15;
+      error = 7;
       break;
     }
     case 5001111: //turn right
     {
-      error = 25;
+      error = 8;
       break;
     }
     case 5011111: //turn right
     {
-      error = 35;
+      error = 9;
       break;
     }
 
@@ -181,6 +181,41 @@ void motor_control()
   if(error==777 || error == 999)//all black //all white
     return;
 
+// if(error == 011111 || error == 001111 || error == 000111) //SHARP RIGHT TURN
+//   {
+//      // Calculating the effective motor speed:
+//  leftMotorSpeed = initial_motor_speed + PID_Val;
+//  rightMotorSpeed = initial_motor_speed + PID_Val;
+//  // The motor speed should not exceed the max PWM value
+//   leftMotorSpeed = constrain(leftMotorSpeed+25, 0, 255);
+//   rightMotorSpeed = constrain(rightMotorSpeed, 0, 255);
+
+//   analogWrite(enb, leftMotorSpeed); //Left Motor Speed
+//   analogWrite(ena, rightMotorSpeed); //Right Motor Speed
+//     turn('R');
+//   delay(500);
+  
+//   return;}
+
+// if(error == 111000 || error == 111100 || error == 111110) //SHARP LEFT TURN
+//   {
+//      // Calculating the effective motor speed:
+//  leftMotorSpeed = initial_motor_speed - PID_Val;
+//  rightMotorSpeed = initial_motor_speed - PID_Val;
+//  // The motor speed should not exceed the max PWM value
+//   leftMotorSpeed = constrain(leftMotorSpeed+25, 0, 255);
+//   rightMotorSpeed = constrain(rightMotorSpeed, 0, 255);
+
+//   analogWrite(enb, leftMotorSpeed); //Left Motor Speed
+//   analogWrite(ena, rightMotorSpeed); //Right Motor Speed
+//     turn('L');
+//   delay(500);
+//   return;
+// }
+
+
+
+
  // Calculating the effective motor speed:
  leftMotorSpeed = initial_motor_speed + PID_Val;
  rightMotorSpeed = initial_motor_speed - PID_Val;
@@ -189,9 +224,29 @@ void motor_control()
   leftMotorSpeed = constrain(leftMotorSpeed+25, 0, 255);
   rightMotorSpeed = constrain(rightMotorSpeed, 0, 255);
 
+  //analogWrite(enb, leftMotorSpeed); //Left Motor Speed
+  //analogWrite(ena, rightMotorSpeed); //Right Motor Speed
+
+
+if(error == 011111 || error == 001111 || error == 000111) //SHARP RIGHT TURN
+  { analogWrite(enb, leftMotorSpeed); //Left Motor Speed
+  analogWrite(ena, (-1)*rightMotorSpeed); //Right Motor Speed 
+    turn('R');
+  delay(50);
+
+  return;}
+
+if(error == 111000 || error == 111100 || error == 111110) //SHARP LEFT TURN
+  {
+    analogWrite(enb, (-1)*leftMotorSpeed); //Left Motor Speed
+  analogWrite(ena, rightMotorSpeed); //Right Motor Speed
+  turn('L');
+  delay(50);
+  return;
+}
+
   analogWrite(enb, leftMotorSpeed); //Left Motor Speed
   analogWrite(ena, rightMotorSpeed); //Right Motor Speed
-
   //following lines of code are to make the bot move forward
   turn('F');
 }
@@ -257,20 +312,20 @@ switch(dir)
   }
     case 'L'://left
   {
-  //left engine
+  //right engine
   digitalWrite(in1, HIGH);//forward
   digitalWrite(in2, LOW);//backwards
-  //right engine
+  //left engine
   digitalWrite(in3, LOW);//forwards
-  digitalWrite(in4, LOW);//backwards
+  digitalWrite(in4, HIGH);//backwards
     break;
   }
     case 'R'://right
   {
-  //left engine
-  digitalWrite(in1, LOW);//forward
-  digitalWrite(in2,LOW);//backwards
   //right engine
+  digitalWrite(in1, LOW);//forward
+  digitalWrite(in2,HIGH);//backwards
+  //left engine
   digitalWrite(in3, HIGH);//forwards
   digitalWrite(in4, LOW);//backwards
     break;
@@ -285,26 +340,26 @@ switch(dir)
   digitalWrite(in4, LOW);//backwards
     break;
   }
-      case '<'://sharp left
-  {
-  //left engine
-  digitalWrite(in1, HIGH);//forward
-  digitalWrite(in2, LOW);//backwards
-  //right engine
-  digitalWrite(in3, LOW);//forwards
-  digitalWrite(in4, HIGH);//backwards
-    break;
-  }
-      case '>'://sharp right
-  {
-  //left engine
-  digitalWrite(in1, LOW);//forward
-  digitalWrite(in2, HIGH);//backwards
-  //right engine
-  digitalWrite(in3, HIGH);//forwards
-  digitalWrite(in4, LOW);//backwards
-    break;
-  }
+  //     case '<'://sharp left
+  // {
+  // //left engine
+  // digitalWrite(in1, HIGH);//forward
+  // digitalWrite(in2, LOW);//backwards
+  // //right engine
+  // digitalWrite(in3, LOW);//forwards
+  // digitalWrite(in4, HIGH);//backwards
+  //   break;
+  // }
+  //     case '>'://sharp right
+  // {
+  // //left engine
+  // digitalWrite(in1, LOW);//forward
+  // digitalWrite(in2, HIGH);//backwards
+  // //right engine
+  // digitalWrite(in3, HIGH);//forwards
+  // digitalWrite(in4, LOW);//backwards
+  //   break;
+  // }
 
 }
 
@@ -338,6 +393,8 @@ void loop()
 getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
 
 getError(); //get the amount of sway off track
+
+
 
 //debug
 //delay(1000);
