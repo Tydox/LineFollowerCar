@@ -1,3 +1,8 @@
+//time
+long previousMillis = 0;        // will store last time
+unsigned long currentMillis=0; //will store current time
+long interval = 1000;           // interval/delay at which to operate
+
 //ENGINE
  const int ena = 3; //left motor - set speed
  const int in1 = 6;
@@ -18,7 +23,7 @@ int initial_motor_speed = 100;
 const int sensorNum=6;
 
 //const int sensorPIN[sensorNum] {12,11,10,7,8,9};
-const int sensorPIN[sensorNum] {7,12,11,10,9,8};
+const byte sensorPIN[sensorNum] {7,12,11,10,9,8};
 //int linePosition;
 
 long linePositionNum=5;//random starting number so i can set 0 as a first digit, 5 will be removed
@@ -180,11 +185,16 @@ void motor_control()
   //change nothing
   if(error==777 || error == 999)//all black //all white
     return;
-if(error<10 && error>-10){
+if(error<10){
  // Calculating the effective motor speed:
  leftMotorSpeed = initial_motor_speed + PID_Val;
+ rightMotorSpeed = initial_motor_speed;
+} else if(error>-10)
+{
+   // Calculating the effective motor speed:
+ leftMotorSpeed = initial_motor_speed + PID_Val;
  rightMotorSpeed = initial_motor_speed - PID_Val;
-
+}
   // The motor speed should not exceed the max PWM value
   leftMotorSpeed = constrain(leftMotorSpeed+25, 0, 255);
   rightMotorSpeed = constrain(rightMotorSpeed, 0, 255);
@@ -199,7 +209,7 @@ if(error<10 && error>-10){
   //following lines of code are to make the bot move forward
   turn('F');
 }
-}
+
 
 
 
@@ -316,23 +326,49 @@ switch(dir)
 
 void sharpTurn() //TO DOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 {
-  switch (error)
+  if(error>=10) //SHARP RIGHT TURN
+  { 
+    analogWrite(enb, initial_motor_speed+25+50); //Left Motor Speed
+    analogWrite(ena, initial_motor_speed); //Right Motor Speed 
+    turn('R');
+    getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
+    getError(); //get the amount of sway off track
+    while(error!=0)
+    {
+          getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
+          getError(); //get the amount of sway off track
+    }
+  }else if(error <=-10) //SHARP LEFT TURN
   {
+    analogWrite(enb, initial_motor_speed+25); //Left Motor Speed
+    analogWrite(ena, initial_motor_speed+50); //Right Motor Speed
+    turn('L');
+    getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
+    getError(); //get the amount of sway off track
+    while(error!=0)
+    {
+        getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
+        getError(); //get the amount of sway off track
+    }
+  }
+}
 
-
-
+void colorSensor(){
+  currentMillis=millis();
+  while(millis()<currentMillis+interval)//function that replaces delay
+  {
+    //DO SOMETHING
   }
 }
 
 void setup(){
-  //sensors
-  Serial.begin(9600);
+  //Serial.begin(9600); //debug sensors
 
   // engines
-  pinMode(in1, OUTPUT);
-  pinMode(in2, OUTPUT);
-  pinMode(in3, OUTPUT);
-  pinMode(in4, OUTPUT);
+  //pinMode(in1, OUTPUT);
+  //pinMode(in2, OUTPUT);
+  //pinMode(in3, OUTPUT);
+  //pinMode(in4, OUTPUT);
 }
 
 
@@ -342,36 +378,11 @@ void loop()
 getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
 getError(); //get the amount of sway off track
 
-if(error>=10) //SHARP RIGHT TURN
-  { 
-    do{
-    getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
-    getError(); //get the amount of sway off track
-    analogWrite(enb, 150); //Left Motor Speed
-    analogWrite(ena, 100); //Right Motor Speed 
-    turn('R');
-    }while(error!=0);
-  }else
-if(error <=-10) //SHARP LEFT TURN
-  {
-    do{
-    getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
-    getError(); //get the amount of sway off track
-    analogWrite(enb, 100); //Left Motor Speed
-    analogWrite(ena, 150); //Right Motor Speed
-    turn('L');
-    }while(error!=0);
-}
+//delay(1000);//debug
+sharpTurn();  //check if need to do sharp turns
+calculate_pid();//check PID
+motor_control();//set speed
 
-//debug
-//delay(1000);
-//check if need to do sharp turns
-//sharpTurn();
-//if(error != 999)
-//check PID and set Speed
-calculate_pid();
-motor_control();
-
-//printDEBUG();
+//printDEBUG(); //debug
  delay(5);
 }
