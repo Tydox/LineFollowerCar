@@ -365,10 +365,12 @@ void setup(){
   //Serial.begin(9600); //debug sensors
 
   // engines
-  //pinMode(in1, OUTPUT);
-  //pinMode(in2, OUTPUT);
-  //pinMode(in3, OUTPUT);
-  //pinMode(in4, OUTPUT);
+  pinMode(ena, OUTPUT);
+  pinMode(enb, OUTPUT);
+  pinMode(in1, OUTPUT);
+  pinMode(in2, OUTPUT);
+  pinMode(in3, OUTPUT);
+  pinMode(in4, OUTPUT);
 }
 
 
