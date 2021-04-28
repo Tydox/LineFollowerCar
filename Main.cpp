@@ -35,8 +35,8 @@ int D=0;
 int prevError=0;
 int prevI=0;
 //PID CONSTANT
-const int Kp=30;
-const int Kd=3;
+const int Kp=5;
+const int Kd=2;
 const int Ki=0;
 const int M0=0;
 
@@ -54,17 +54,17 @@ void getError()
   {
     case 5111110:
     {
-      error = -9;
+      error = -16;
       break;
     }
     case 5111100:
     {
-      error = -8;
+      error = -14;
       break;
     }
     case 5111000:
     {
-      error = -7;
+      error = -12;
       break;
     }
     case 5100000:
@@ -125,17 +125,17 @@ void getError()
 
     case 5000111: //turn right
     {
-      error = 7;
+      error = 12;
       break;
     }
     case 5001111: //turn right
     {
-      error = 8;
+      error = 14;
       break;
     }
     case 5011111: //turn right
     {
-      error = 9;
+      error = 16;
       break;
     }
 
@@ -180,42 +180,7 @@ void motor_control()
   //change nothing
   if(error==777 || error == 999)//all black //all white
     return;
-
-// if(error == 011111 || error == 001111 || error == 000111) //SHARP RIGHT TURN
-//   {
-//      // Calculating the effective motor speed:
-//  leftMotorSpeed = initial_motor_speed + PID_Val;
-//  rightMotorSpeed = initial_motor_speed + PID_Val;
-//  // The motor speed should not exceed the max PWM value
-//   leftMotorSpeed = constrain(leftMotorSpeed+25, 0, 255);
-//   rightMotorSpeed = constrain(rightMotorSpeed, 0, 255);
-
-//   analogWrite(enb, leftMotorSpeed); //Left Motor Speed
-//   analogWrite(ena, rightMotorSpeed); //Right Motor Speed
-//     turn('R');
-//   delay(500);
-  
-//   return;}
-
-// if(error == 111000 || error == 111100 || error == 111110) //SHARP LEFT TURN
-//   {
-//      // Calculating the effective motor speed:
-//  leftMotorSpeed = initial_motor_speed - PID_Val;
-//  rightMotorSpeed = initial_motor_speed - PID_Val;
-//  // The motor speed should not exceed the max PWM value
-//   leftMotorSpeed = constrain(leftMotorSpeed+25, 0, 255);
-//   rightMotorSpeed = constrain(rightMotorSpeed, 0, 255);
-
-//   analogWrite(enb, leftMotorSpeed); //Left Motor Speed
-//   analogWrite(ena, rightMotorSpeed); //Right Motor Speed
-//     turn('L');
-//   delay(500);
-//   return;
-// }
-
-
-
-
+if(error<10 && error>-10){
  // Calculating the effective motor speed:
  leftMotorSpeed = initial_motor_speed + PID_Val;
  rightMotorSpeed = initial_motor_speed - PID_Val;
@@ -224,33 +189,17 @@ void motor_control()
   leftMotorSpeed = constrain(leftMotorSpeed+25, 0, 255);
   rightMotorSpeed = constrain(rightMotorSpeed, 0, 255);
 
-  //analogWrite(enb, leftMotorSpeed); //Left Motor Speed
-  //analogWrite(ena, rightMotorSpeed); //Right Motor Speed
-
-
-if(error == 011111 || error == 001111 || error == 000111) //SHARP RIGHT TURN
-  { analogWrite(enb, leftMotorSpeed); //Left Motor Speed
-  analogWrite(ena, (-1)*rightMotorSpeed); //Right Motor Speed 
-    turn('R');
-  delay(50);
-
-  return;}
-
-if(error == 111000 || error == 111100 || error == 111110) //SHARP LEFT TURN
-  {
-    analogWrite(enb, (-1)*leftMotorSpeed); //Left Motor Speed
-  analogWrite(ena, rightMotorSpeed); //Right Motor Speed
-  turn('L');
-  delay(50);
-  return;
-}
-
   analogWrite(enb, leftMotorSpeed); //Left Motor Speed
   analogWrite(ena, rightMotorSpeed); //Right Motor Speed
+
+
+
+  analogWrite(enb, leftMotorSpeed); //Left Motor Speed
+  analogWrite(ena, initial_motor_speed); //Right Motor Speed
   //following lines of code are to make the bot move forward
   turn('F');
 }
-
+}
 
 
 
@@ -391,10 +340,28 @@ void loop()
 {
  
 getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
-
 getError(); //get the amount of sway off track
 
-
+if(error>=10) //SHARP RIGHT TURN
+  { 
+    do{
+    getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
+    getError(); //get the amount of sway off track
+    analogWrite(enb, 150); //Left Motor Speed
+    analogWrite(ena, 100); //Right Motor Speed 
+    turn('R');
+    }while(error!=0);
+  }else
+if(error <=-10) //SHARP LEFT TURN
+  {
+    do{
+    getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
+    getError(); //get the amount of sway off track
+    analogWrite(enb, 100); //Left Motor Speed
+    analogWrite(ena, 150); //Right Motor Speed
+    turn('L');
+    }while(error!=0);
+}
 
 //debug
 //delay(1000);
@@ -406,5 +373,5 @@ calculate_pid();
 motor_control();
 
 //printDEBUG();
- delay(20);
+ delay(5);
 }
