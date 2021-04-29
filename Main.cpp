@@ -4,12 +4,12 @@ unsigned long currentMillis=0; //will store current time
 long interval = 1000;           // interval/delay at which to operate
 
 //ENGINE
- const int ena = 3; //left motor - set speed
- const int in1 = 6;
- const int in2 = 13;
- const int in3 = 2; 
- const int in4 = 4;
- const int enb = 5; //right motor - set speed
+ const byte ena = 3; //left motor - set speed
+ const byte in1 = 6;
+ const byte in2 = 13;
+ const byte in3 = 2; 
+ const byte in4 = 4;
+ const byte enb = 5; //right motor - set speed
 
 
 //controll the engine
@@ -17,12 +17,11 @@ int leftMotorSpeed=0;
 int rightMotorSpeed=0;
 
 //Initial Speed of Motor
-int initial_motor_speed = 100;
+const int initial_motor_speed = 150;
 
 //IR SENSOR
-const int sensorNum=6;
+const byte sensorNum=6;
 
-//const int sensorPIN[sensorNum] {12,11,10,7,8,9};
 const byte sensorPIN[sensorNum] {7,12,11,10,9,8};
 //int linePosition;
 
@@ -40,10 +39,10 @@ int D=0;
 int prevError=0;
 int prevI=0;
 //PID CONSTANT
-const int Kp=5;
-const int Kd=2;
-const int Ki=0;
-const int M0=0;
+const byte Kp=7;
+const byte Kd=2;
+const byte Ki=0;
+const byte M0=0;
 
 
 //Iterate over the IR sensors, and create a 6digit num (sensor)*10+new sensor - 000000 001100 010000
@@ -59,42 +58,42 @@ void getError()
   {
     case 5111110:
     {
-      error = -16;
+      error = -15;
       break;
     }
     case 5111100:
     {
-      error = -14;
+      error = -15;
       break;
     }
     case 5111000:
     {
-      error = -12;
+      error = -15;
       break;
     }
     case 5100000:
     {
-      error = -10;
+      error = -5;
       break;
     }
     case 5110000:
     {
-      error = -8;
+      error = -4;
       break;
     }
     case 5010000:
     {
-      error = -6;
+      error = -3;
       break;
     }
     case 5011000:
     {
-      error = -4;
+      error = -2;
       break;
     }
     case 5001000:
     {
-      error = -2;
+      error = -1;
       break;
     }
     case 5001100:
@@ -104,43 +103,43 @@ void getError()
     }
     case 5000100:
     {
-      error = 2;
+      error = 1;
       break;
     }
     case 5000110:
     {
-      error = 4;
+      error = 2;
       break;
     }
     case 5000010:
     {
-      error = 6;
+      error = 3;
       break;
     }
     case 5000011:
     {
-      error = 8;
+      error = 4;
       break;
     }
     case 5000001: //turn right
     {
-      error = 10;
+      error = 5;
       break;
     }
 
     case 5000111: //turn right
     {
-      error = 12;
+      error = 15;
       break;
     }
     case 5001111: //turn right
     {
-      error = 14;
+      error = 15;
       break;
     }
     case 5011111: //turn right
     {
-      error = 16;
+      error = 15;
       break;
     }
 
@@ -157,7 +156,7 @@ void getError()
     
     default: 
     {
-       Serial.println("Unkown Error - Line Following Status"); 
+       //Serial.println("Unkown Error - Line Following Status"); 
        break; 
     }
   }
@@ -174,7 +173,7 @@ void calculate_pid()
 
   PID_Val = (Kp * P) + (Ki * I) + (Kd * D);
 
-  //prevI = I;
+  prevI = I;
   prevError = error;
   }
 }
@@ -185,27 +184,27 @@ void motor_control()
   //change nothing
   if(error==777 || error == 999)//all black //all white
     return;
-if(error<10){
- // Calculating the effective motor speed:
- leftMotorSpeed = initial_motor_speed + PID_Val;
- rightMotorSpeed = initial_motor_speed;
-} else if(error>-10)
-{
-   // Calculating the effective motor speed:
+//   if(error<10 && error > 0){
+//    // Calculating the effective motor speed:
+//    leftMotorSpeed = initial_motor_speed + PID_Val;
+//    rightMotorSpeed = initial_motor_speed;
+//   } else if(error>-10 && error < 0)
+//   {
+//      // Calculating the effective motor speed:
+//    leftMotorSpeed = initial_motor_speed;
+//    rightMotorSpeed = initial_motor_speed - PID_Val;
+//  }
+
  leftMotorSpeed = initial_motor_speed + PID_Val;
  rightMotorSpeed = initial_motor_speed - PID_Val;
-}
+
   // The motor speed should not exceed the max PWM value
-  leftMotorSpeed = constrain(leftMotorSpeed+25, 0, 255);
+  leftMotorSpeed = constrain(leftMotorSpeed, 0, 255);
   rightMotorSpeed = constrain(rightMotorSpeed, 0, 255);
 
-  analogWrite(enb, leftMotorSpeed); //Left Motor Speed
-  analogWrite(ena, rightMotorSpeed); //Right Motor Speed
+  analogWrite(enb, leftMotorSpeed+25-8); //Left Motor Speed
+  analogWrite(ena, rightMotorSpeed+8); //Right Motor Speed
 
-
-
-  analogWrite(enb, leftMotorSpeed); //Left Motor Speed
-  analogWrite(ena, initial_motor_speed); //Right Motor Speed
   //following lines of code are to make the bot move forward
   turn('F');
 }
@@ -228,13 +227,13 @@ void printErrorVal()
 
 void printMotors()
 {
-  Serial.print("PID Value:");
+  Serial.print("PID Value:  ");
     Serial.print(PID_Val);
     Serial.print("\t");
-    Serial.print("Left Value:");
+    Serial.print("Left:  ");
     Serial.print(leftMotorSpeed);
     Serial.print("\t");
-    Serial.print("Right Value:");
+    Serial.print("Right:  ");
     Serial.print(rightMotorSpeed);
     Serial.print("\t");
 }
@@ -326,26 +325,34 @@ switch(dir)
 
 void sharpTurn() //TO DOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
 {
-  if(error>=10) //SHARP RIGHT TURN
-  { 
-    analogWrite(enb, initial_motor_speed+25+50); //Left Motor Speed
-    analogWrite(ena, initial_motor_speed); //Right Motor Speed 
+  if(error==15) //SHARP RIGHT TURN
+  {
+    turn('B'); 
+    analogWrite(enb, initial_motor_speed+25-8); //Left Motor Speed
+    analogWrite(ena, initial_motor_speed+8); //Right Motor Speed
+    
+    delay(350);
+    analogWrite(enb, initial_motor_speed+25+50-8); //Left Motor Speed
+    analogWrite(ena, initial_motor_speed+8); //Right Motor Speed 
+    
     turn('R');
-    getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
-    getError(); //get the amount of sway off track
-    while(error!=0)
+    while(error<=4 &&error >=-4)
     {
           getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
           getError(); //get the amount of sway off track
     }
-  }else if(error <=-10) //SHARP LEFT TURN
+  }else if(error==-15) //SHARP LEFT TURN
   {
-    analogWrite(enb, initial_motor_speed+25); //Left Motor Speed
-    analogWrite(ena, initial_motor_speed+50); //Right Motor Speed
+    turn('B');
+    analogWrite(enb, initial_motor_speed+25-8); //Left Motor Speed
+    analogWrite(ena, initial_motor_speed+8); //Right Motor Speed
+    
+    delay(350);
+    analogWrite(enb, initial_motor_speed+25-8); //Left Motor Speed
+    analogWrite(ena, initial_motor_speed+50+8); //Right Motor Speed
     turn('L');
-    getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
-    getError(); //get the amount of sway off track
-    while(error!=0)
+
+    while(error<=4 &&error >=-4)
     {
         getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
         getError(); //get the amount of sway off track
@@ -362,7 +369,8 @@ void colorSensor(){
 }
 
 void setup(){
-  //Serial.begin(9600); //debug sensors
+
+  Serial.begin(9600); //debug sensors
 
   // engines
   pinMode(ena, OUTPUT);
@@ -371,6 +379,8 @@ void setup(){
   pinMode(in2, OUTPUT);
   pinMode(in3, OUTPUT);
   pinMode(in4, OUTPUT);
+
+  delay(2000);
 }
 
 
@@ -381,10 +391,10 @@ getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
 getError(); //get the amount of sway off track
 
 //delay(1000);//debug
-sharpTurn();  //check if need to do sharp turns
+//sharpTurn();  //check if need to do sharp turns
 calculate_pid();//check PID
 motor_control();//set speed
-
 //printDEBUG(); //debug
+
  delay(5);
 }
