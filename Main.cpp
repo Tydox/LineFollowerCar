@@ -1,8 +1,4 @@
-
-#include "Melopero_APDS9960.h"
-
-Melopero_APDS9960 device;
-
+//DEFINES FOR MUSIC
 //#define NOTE_B0  31
 //#define NOTE_C1  33
 //#define NOTE_CS1 35
@@ -94,18 +90,54 @@ Melopero_APDS9960 device;
 //#define NOTE_DS8 4978
 #define REST 0
 
-void printColor(uint16_t r, uint16_t g, uint16_t b, uint16_t c)
-{
-    Serial.print("R: ");
-    Serial.print(r);
-    Serial.print(" G: ");
-    Serial.print(g);
-    Serial.print(" B: ");
-    Serial.print(b);
-    Serial.print(" C: ");
-    Serial.println(c);
-}
+//libraries
+#include <Wire.h>
+#include <SparkFun_APDS9960.h>
+// Global Variables
+SparkFun_APDS9960 apds = SparkFun_APDS9960();
+uint8_t proximity_data = 0;
+uint16_t ambient_light = 0;
+uint16_t red_light = 0;
+uint16_t green_light = 0;
+uint16_t blue_light = 0;
 
+
+//motor pins
+const byte RIGHT_DIRECTION=10;//PH1
+const byte RIGHT_MOTOR=11;
+const byte LEFT_DIRECTION=6;//PH2
+const byte LEFT_MOTOR=5;
+const byte MODE=3;
+
+//motor speed
+int LEFT_MOTOR_SPEED=0;
+int RIGHT_MOTOR_SPEED=0;
+
+//initial Motor Speed
+const int INITIAL_MOTOR_SPEED=100;
+
+
+//IR SENSORS
+const byte IR_Sensor_Num=6;
+const byte IR_Sensor_Pin[IR_Sensor_Num]={13,12,9,8,7,6};
+
+//Line Position
+long Line_Position=5; //5 is just so i can have 0 as msb
+
+//PID
+int PID=0;
+int error=0;
+int P=0;
+int I=0;
+int D=0;
+int prevError=0;
+int prevI=0;
+//PID CONSTANTS
+const byte Kp=5;
+const byte Ki=0;
+const byte Kd=2;
+
+//MUSIC
 int melodywii[] = {
 
   NOTE_FS4,8, REST,8, NOTE_A4,8, NOTE_CS5,8, REST,8,NOTE_A4,8, REST,8, NOTE_FS4,8, //1
@@ -196,9 +228,180 @@ int wholenote = (60000 * 4) / tempo;
 int divider = 0;
 int noteDuration = 0;
 
+//functions
+
+//Iterate over the IR sensors, and create a 6digit num (sensor)*10+new sensor - 000000 001100 010000
+void getLinePositionNum()
+{
+    Line_Position = 5; //reset value
+    for (int i = 0; i < IR_Sensor_Num; ++i)
+        Line_Position = (Line_Position * 10) + digitalRead(IR_Sensor_Pin[i]);
+}
+
+//check line position and set an error value
+void getError()
+{
+    switch (Line_Position)    {
+    case 5111110:    {        error = -15;        break;    }
+    case 5111100:    {        error = -15;        break;    }
+    case 5111000:    {        error = -15;        break;    }
+    case 5100000:    {        error = -5;         break;    }
+    case 5110000:    {        error = -4;         break;    }
+    case 5010000:    {        error = -3;         break;    }
+    case 5011000:    {        error = -2;         break;    }
+    case 5001000:    {        error = -1;         break;    }
+    case 5001100:    {        error = 0;          break;    }
+    case 5000100:    {        error = 1;          break;    }
+    case 5000110:    {        error = 2;          break;    }
+    case 5000010:    {        error = 3;          break;    }
+    case 5000011:    {        error = 4;          break;    }
+    case 5000001:    {        error = 5;          break;    }//turn right
+    case 5000111:    {        error = 15;         break;    } //turn right
+    case 5001111:    {        error = 15;         break;    } //turn right
+    case 5011111:    {        error = 15;         break;    }//turn right
+    case 5000000:    {        error = 999;        break;    }//continue
+    case 5111111:    {        error = 777;        break;    }//continue
+    default:    { /*Serial.println("Unkown Error - Line Following Status");*/ break;    }
+    }
+}
+
+//CALCULATE PID VALUE BASED ON ERRORS 
+void update_PID(){
+
+if (error != 777 && error != 999)//as long as its not white\black line calc a new pid value
+    {
+        P = error;
+        I = I + prevI;
+        D = error - prevError;
+        PID = (Kp * P) + (Ki * I) + (Kd * D);
+        prevI = I;
+        prevError = error;
+    }
+}
+
+//CONTROL MOTOR BASED ON PID
+void set_motors(){
+
+if (error == 777 || error == 999) //all black\white - skip
+        return;
+
+    LEFT_MOTOR_SPEED = INITIAL_MOTOR_SPEED + PID;
+    RIGHT_MOTOR_SPEED= INITIAL_MOTOR_SPEED - PID;
+
+ // The motor speed should not exceed the max PWM value
+    LEFT_MOTOR_SPEED = constrain(LEFT_MOTOR_SPEED, 0, 255);
+    RIGHT_MOTOR_SPEED = constrain(RIGHT_MOTOR_SPEED, 0, 255);
+
+    analogWrite(LEFT_MOTOR, LEFT_MOTOR_SPEED+5);  //Left Motor Speed
+    analogWrite(RIGHT_MOTOR, RIGHT_MOTOR_SPEED); //Right Motor Speed
+
+    set_direction('F');
+}
+
+void set_speed(byte left, byte right){
+  analogWrite(LEFT_MOTOR, left+5);  //Left Motor Speed
+    analogWrite(RIGHT_MOTOR, right); //Right Motor Speed
+}
+
+//TURN - set wheels direction - 0=forward 1=backward
+void set_direction(char dir)
+{
+    switch (dir)
+    {
+    case 'F':    {        digitalWrite(LEFT_DIRECTION, LOW);        digitalWrite(RIGHT_DIRECTION, LOW);          break;    }//forward
+    case 'B':    {        digitalWrite(LEFT_DIRECTION, HIGH);       digitalWrite(RIGHT_DIRECTION, HIGH);         break;    }//backwards
+   // case 'L':    {        digitalWrite(LEFT_DIRECTION, LOW);        analogWrite(RIGHT_MOTOR, 0);                 break;    }//left turn 90
+   // case 'R':    {        analogWrite(LEFT_MOTOR, 0);               digitalWrite(RIGHT_DIRECTION, LOW);          break;    }//right turn 90
+    case 'S':    {        analogWrite(LEFT_MOTOR, 0);               analogWrite(RIGHT_MOTOR, 0);                 break;    }//stop
+    }
+}
+
+//PRINT DATA
+void printIRDigital()
+{
+    Serial.print("Digital Reading: ");
+    Serial.print(Line_Position);
+    Serial.print("\t");
+}
+
+void printErrorVal()
+{
+    Serial.print("Error Reading: ");
+    Serial.println(error);
+}
+
+void printMotors()
+{
+    Serial.print("PID Value:  ");
+    Serial.print(PID);
+    Serial.print("\t");
+    Serial.print("Left:  ");
+    Serial.print(LEFT_MOTOR_SPEED);
+    Serial.print("\t");
+    Serial.print("Right:  ");
+    Serial.print(RIGHT_MOTOR_SPEED);
+    Serial.print("\t");
+}
+
+void print_DEBUG()
+{
+    printMotors();
+    printIRDigital();
+    printErrorVal();
+    print_Colors();
+    print_Proxy();
+}
+
+void update_Proxy(){
+  if ( !apds.readProximity(proximity_data) ) {       
+     Serial.println("Error reading proximity value");  
+        } else {    
+              if(proximity_data>=20)
+              { 
+                 set_speed(40,40); //slow down car
+                 while(proximity_data>=20 && proximity_data <40)
+                  { apds.readProximity(proximity_data); }
+                  if(proximity_data>=40){  set_speed(0,0); }      
+              }//stop car
+                 update_Color();
+                 while(proximity_data>=20)    {      apds.readProximity(proximity_data);    }
+               }
+}
+
+void update_Color(){
+  // Read the light levels (ambient, red, green, blue)
+  if (  !apds.readAmbientLight(ambient_light) ||
+        !apds.readRedLight(red_light) ||
+        !apds.readGreenLight(green_light) ||
+        !apds.readBlueLight(blue_light) ) {
+    Serial.println("Error reading light values");
+  } else {
+    musika();
+  }
+}
+
+void print_Proxy()
+{
+    Serial.print("Proximity: ");
+    Serial.println(proximity_data);
+}
+
+void print_Colors()
+{
+  Serial.print("Ambient: ");
+    Serial.print(ambient_light);
+    Serial.print(" Red: ");
+    Serial.print(red_light);
+    Serial.print(" Green: ");
+    Serial.print(green_light);
+    Serial.print(" Blue: ");
+    Serial.println(blue_light);
+}
+
+
 void musika()
 {
-    if (device.red > 200 && device.red > device.blue && device.red > device.green)
+    if (red_light > 200 && red_light > blue_light && red_light > green_light)
     {
         for (int thisNote = 0; thisNote < notes * 2; thisNote = thisNote + 2)
         {
@@ -218,7 +421,7 @@ void musika()
         }
     }
 
-    if (device.blue > 200 && device.blue > device.red && device.blue > device.green)
+    if (blue_light > 200 && blue_light > red_light && blue_light > green_light)
     {
         for (int thisNote = 0; thisNote < noteswii * 2; thisNote = thisNote + 2)
         {
@@ -238,7 +441,7 @@ void musika()
         }
     }
 
-    if (device.green > 200 && device.green > device.red && device.green > device.blue)
+    if (green_light > 200 && green_light > red_light && green_light > blue_light)
     {
         for (int thisNote = 0; thisNote < notesharry * 2; thisNote = thisNote + 2)
         {
@@ -259,437 +462,43 @@ void musika()
     }
 }
 
-//time
-long previousMillis = 0;         // will store last time
-unsigned long currentMillis = 0; //will store current time
-long interval = 1000;            // interval/delay at which to operate
-
-//ENGINE
-const byte ena = 3; //left motor - set speed
-const byte in1 = 6;
-const byte in2 = 13;
-const byte in3 = 2;
-const byte in4 = 4;
-const byte enb = 5; //right motor - set speed
-
-//controll the engine
-int leftMotorSpeed = 0;
-int rightMotorSpeed = 0;
-
-//Initial Speed of Motor
-const int initial_motor_speed = 150;
-
-//IR SENSOR
-const byte sensorNum = 6;
-
-const byte sensorPIN[sensorNum]{7, 12, 11, 10, 9, 8};
-//int linePosition;
-
-long linePositionNum = 5; //random starting number so i can set 0 as a first digit, 5 will be removed
-//COLOR & DISTANCE SENSOR
-
-//PID CONTROLLER
-//PID VARIABLES
-int PID_Val = 0;
-int error = 0;
-int P = 0;
-int I = 0;
-int D = 0;
-int prevError = 0;
-int prevI = 0;
-//PID CONSTANT
-const byte Kp = 7;
-const byte Kd = 2;
-const byte Ki = 0;
-const byte M0 = 0;
-
-//Iterate over the IR sensors, and create a 6digit num (sensor)*10+new sensor - 000000 001100 010000
-void getLinePositionNum()
-{
-    linePositionNum = 5;
-    for (int i = 0; i < sensorNum; ++i)
-        linePositionNum = (linePositionNum * 10) + digitalRead(sensorPIN[i]);
-}
-
-void getError()
-{
-    switch (linePositionNum)
-    {
-    case 5111110:
-    {
-        error = -15;
-        break;
-    }
-    case 5111100:
-    {
-        error = -15;
-        break;
-    }
-    case 5111000:
-    {
-        error = -15;
-        break;
-    }
-    case 5100000:
-    {
-        error = -5;
-        break;
-    }
-    case 5110000:
-    {
-        error = -4;
-        break;
-    }
-    case 5010000:
-    {
-        error = -3;
-        break;
-    }
-    case 5011000:
-    {
-        error = -2;
-        break;
-    }
-    case 5001000:
-    {
-        error = -1;
-        break;
-    }
-    case 5001100:
-    {
-        error = 0;
-        break;
-    }
-    case 5000100:
-    {
-        error = 1;
-        break;
-    }
-    case 5000110:
-    {
-        error = 2;
-        break;
-    }
-    case 5000010:
-    {
-        error = 3;
-        break;
-    }
-    case 5000011:
-    {
-        error = 4;
-        break;
-    }
-    case 5000001: //turn right
-    {
-        error = 5;
-        break;
-    }
-
-    case 5000111: //turn right
-    {
-        error = 15;
-        break;
-    }
-    case 5001111: //turn right
-    {
-        error = 15;
-        break;
-    }
-    case 5011111: //turn right
-    {
-        error = 15;
-        break;
-    }
-
-    case 5000000: //continue
-    {
-        error = 999;
-        break;
-    }
-    case 5111111: //continue
-    {
-        error = 777;
-        break;
-    }
-
-    default:
-    {
-        //Serial.println("Unkown Error - Line Following Status");
-        break;
-    }
-    }
-}
-
-void calculate_pid()
-{
-    if (error != 777 && error != 999)
-    {
-        P = error;
-        I = I + prevI;
-        D = error - prevError;
-
-        PID_Val = (Kp * P) + (Ki * I) + (Kd * D);
-
-        prevI = I;
-        prevError = error;
-    }
-}
-
-void motor_control()
-{
-    //change nothing
-    if (error == 777 || error == 999) //all black //all white
-        return;
-    //   if(error<10 && error > 0){
-    //    // Calculating the effective motor speed:
-    //    leftMotorSpeed = initial_motor_speed + PID_Val;
-    //    rightMotorSpeed = initial_motor_speed;
-    //   } else if(error>-10 && error < 0)
-    //   {
-    //      // Calculating the effective motor speed:
-    //    leftMotorSpeed = initial_motor_speed;
-    //    rightMotorSpeed = initial_motor_speed - PID_Val;
-    //  }
-
-    leftMotorSpeed = initial_motor_speed + PID_Val;
-    rightMotorSpeed = initial_motor_speed - PID_Val;
-
-    // The motor speed should not exceed the max PWM value
-    leftMotorSpeed = constrain(leftMotorSpeed, 0, 255);
-    rightMotorSpeed = constrain(rightMotorSpeed, 0, 255);
-
-    analogWrite(enb, leftMotorSpeed);  //Left Motor Speed
-    analogWrite(ena, rightMotorSpeed); //Right Motor Speed
-
-    //following lines of code are to make the bot move forward
-    turn('F');
-}
-
-void printIRDigital()
-{
-    Serial.print("Digital Reading: ");
-    Serial.print(linePositionNum);
-    Serial.print("\t");
-}
-
-void printErrorVal()
-{
-    Serial.print("Error Reading: ");
-    Serial.println(error);
-}
-
-void printMotors()
-{
-    Serial.print("PID Value:  ");
-    Serial.print(PID_Val);
-    Serial.print("\t");
-    Serial.print("Left:  ");
-    Serial.print(leftMotorSpeed);
-    Serial.print("\t");
-    Serial.print("Right:  ");
-    Serial.print(rightMotorSpeed);
-    Serial.print("\t");
-}
-
-void printDEBUG()
-{
-    printMotors();
-    printIRDigital();
-    printErrorVal();
-}
-
-void turn(char dir)
-{
-    switch (dir)
-    {
-    case 'F': //forward
-    {
-        //left engine
-        digitalWrite(in1, HIGH); //forward
-        digitalWrite(in2, LOW);  //backwards
-        //right engine
-        digitalWrite(in3, HIGH); //forward
-        digitalWrite(in4, LOW);  //backwards
-        break;
-    }
-    case 'B': //backwards
-    {
-        //left engine
-        digitalWrite(in1, LOW);  //forward
-        digitalWrite(in2, HIGH); //backwards
-        //right engine
-        digitalWrite(in3, LOW);  //forwards
-        digitalWrite(in4, HIGH); //backwards
-        break;
-    }
-    case 'L': //left
-    {
-        //right engine
-        digitalWrite(in1, HIGH); //forward
-        digitalWrite(in2, LOW);  //backwards
-        //left engine
-        digitalWrite(in3, LOW);  //forwards
-        digitalWrite(in4, HIGH); //backwards
-        break;
-    }
-    case 'R': //right
-    {
-        //right engine
-        digitalWrite(in1, LOW);  //forward
-        digitalWrite(in2, HIGH); //backwards
-        //left engine
-        digitalWrite(in3, HIGH); //forwards
-        digitalWrite(in4, LOW);  //backwards
-        break;
-    }
-    case 'S': //stop
-    {
-        //left engine
-        digitalWrite(in1, LOW); //forward
-        digitalWrite(in2, LOW); //backwards
-        //right engine
-        digitalWrite(in3, LOW); //forwards
-        digitalWrite(in4, LOW); //backwards
-        break;
-    }
-        //     case '<'://sharp left
-        // {
-        // //left engine
-        // digitalWrite(in1, HIGH);//forward
-        // digitalWrite(in2, LOW);//backwards
-        // //right engine
-        // digitalWrite(in3, LOW);//forwards
-        // digitalWrite(in4, HIGH);//backwards
-        //   break;
-        // }
-        //     case '>'://sharp right
-        // {
-        // //left engine
-        // digitalWrite(in1, LOW);//forward
-        // digitalWrite(in2, HIGH);//backwards
-        // //right engine
-        // digitalWrite(in3, HIGH);//forwards
-        // digitalWrite(in4, LOW);//backwards
-        //   break;
-        // }
-    }
-}
-
-void sharpTurn() //TO DOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
-{
-    if (error == 15) //SHARP RIGHT TURN
-    {
-        turn('B');
-        analogWrite(enb, initial_motor_speed + 25 - 8); //Left Motor Speed
-        analogWrite(ena, initial_motor_speed + 8);      //Right Motor Speed
-
-        delay(350);
-        analogWrite(enb, initial_motor_speed + 25 + 50 - 8); //Left Motor Speed
-        analogWrite(ena, initial_motor_speed + 8);           //Right Motor Speed
-
-        turn('R');
-        while (error <= 4 && error >= -4)
-        {
-            getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
-            getError();           //get the amount of sway off track
-        }
-    }
-    else if (error == -15) //SHARP LEFT TURN
-    {
-        turn('B');
-        analogWrite(enb, initial_motor_speed + 25 - 8); //Left Motor Speed
-        analogWrite(ena, initial_motor_speed + 8);      //Right Motor Speed
-
-        delay(350);
-        analogWrite(enb, initial_motor_speed + 25 - 8); //Left Motor Speed
-        analogWrite(ena, initial_motor_speed + 50 + 8); //Right Motor Speed
-        turn('L');
-
-        while (error <= 4 && error >= -4)
-        {
-            getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
-            getError();           //get the amount of sway off track
-        }
-    }
-}
-
-int8_t status = NO_ERROR;
-
-void printError(int8_t error_code){
-  if (error_code == NO_ERROR)
-    Serial.println("No error :)");
-  else if (error_code == I2C_ERROR)
-    Serial.println("I2C comunication error :(");
-  else if (error_code == INVALID_ARGUMENT)
-    Serial.println("Invalid argument error :(");
-  else 
-    Serial.println("Unknown error O.O");
-}
-
-
-
-void setup()
-{
-    Serial.begin(9600); // Initialize serial comunication
-    while (!Serial);                              // wait for serial to be ready
-    device.init();                     // Initialize the comunication library
-    device.reset();                    // Reset all interrupt settings and power off the device
-    device.enableAlsEngine();          // enable the color/ALS engine
-    device.setAlsIntegrationTime(450); // set the color engine integration time
-    device.updateSaturation();         // updates the saturation value, stored in device.alsSaturation
-    device.wakeUp();                   // wake up the device
-
-    pinMode(ena, OUTPUT);
-    pinMode(enb, OUTPUT);
-    pinMode(in1, OUTPUT);
-    pinMode(in2, OUTPUT);
-    pinMode(in3, OUTPUT);
-    pinMode(in4, OUTPUT);
-
-  // Every function of the library returns a status code (int8_t). 
-  // There are 3 possible status codes (more may be added in the future):
-  // NO_ERROR, I2C_ERROR, INVALID_ARGUMENT
-  status = NO_ERROR;
-  status = device.init(); // Initialize the comunication library
-  printError(status);
-  status = device.reset(); // Reset all interrupt settings and power off the device
-  printError(status);
-
-  status = device.enableProximityEngine(); // Enable the proximity engine
-  printError(status);
+void setup() {
+  Serial.begin(9600);
+  while(!Serial); // wait for serial to be ready
+  // Initialize APDS-9960 (configure I2C and initial values)
+  if ( apds.init() ) {    Serial.println(F("APDS-9960 initialization complete"));  } else {    Serial.println(F("Something went wrong during APDS-9960 init!"));  }
+  // Adjust the Proximity sensor gain
+  if ( !apds.setProximityGain(PGAIN_2X) ) {    Serial.println(F("Something went wrong trying to set PGAIN"));  }
+  // Start running the APDS-9960 proximity sensor (no interrupts)
+  if ( apds.enableProximitySensor(false) ) {    Serial.println(F("Proximity sensor is now running"));  } else {    Serial.println(F("Something went wrong during sensor init!"));  }
+  // Start running the APDS-9960 light sensor (no interrupts)
+  if ( apds.enableLightSensor(false) ) {    Serial.println(F("Light sensor is now running"));  } else {    Serial.println(F("Something went wrong during light sensor init!"));  }
   
-  status = device.wakeUp(); // Wake up the device
-  printError(status);
+  // Wait for initialization and calibration to finish
+  delay(500);
 
+  //Set Pins
+  pinMode(MODE,OUTPUT);
+  digitalWrite(MODE,HIGH); //set motor driver to PHASE ENABLE 
+  pinMode(RIGHT_DIRECTION,OUTPUT);
+  pinMode(RIGHT_MOTOR,OUTPUT);
+  pinMode(LEFT_DIRECTION,OUTPUT);
+  pinMode(LEFT_MOTOR,OUTPUT);
+  tone(buzzer, 1000);
+  delay(1500);  //wait to allow manual alignment
+  noTone(buzzer);
+  tone(buzzer, 1000);
+  noTone(buzzer);
+  tone(buzzer, 1000);
+  noTone(buzzer);
 
-    //delay(2000);
 }
 
-void loop()
-{
-    device.updateColorData(); // update the values stored in device.red/green/blue/clear
-    Serial.println("Raw color data:");
-    printColor(device.red, device.green, device.blue, device.clear); // print raw values
-    //musika();
+void loop() {
+    update_Proxy(); //check proxy and if senses a block at 20 distance interrupt and stop the car and sense the color
     getLinePositionNum(); //get the line position from the IR sensors XXX-XXX
     getError();           //get the amount of sway off track
-
-  status = device.updateProximityData(); // Update the proximity data and retrieve the status code
-  //printError(status); // Examine the status code 
-Serial.print("Prox: ");
-  Serial.println(device.proximityData); // print the proximity data
-
-    //delay(1000);//debug
-    //sharpTurn();  //check if need to do sharp turns
-    //calculate_pid();//check PID
-    //motor_control();//set speed
-    //printDEBUG(); //debug
-
-    //analogWrite(enb, 100+5); //Left Motor Speed
-    //analogWrite(ena, 100); //Right Motor Speed
-    //turn('F');
-        delay(1000);
-
-    delay(5);
+    print_DEBUG();
+    update_PID();//check PID
+    set_motors();//set speed
 }
